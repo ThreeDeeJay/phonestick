@@ -78,24 +78,29 @@ class MainActivity : Activity() {
             if (!(Shell.SU.run(arrayOf(
                     // Remember current UDC and disable USB
                     "cat $usb/UDC > /data/local/tmp/udc.bak",
-                    "echo > $usb/UDC",
-                    
+                    "echo 'none' > $usb/UDC",
+
                     // Disable and remove any existing mass storage gadget(s)
                     "if [ -e $usb_cfg/mass_storage.usb0 ]; then rm -f $usb_cfg/mass_storage.usb0; fi",
                     "if [ -e $usb_fun/mass_storage.usb0 ]; then rmdir $usb_fun/mass_storage.usb0; fi",
 
-                    // Create and configure mass storage gadget
-                    "mkdir $usb_fun/mass_storage.usb0",
-                    "echo 0 > $usb_lun/cdrom",
-                    "echo $file > $usb_lun/file",
-                    "echo USBMountr > $usb_lun/inquiry_string",
-                    "echo 1 > $usb_lun/nofua",
-                    "echo $ro > $usb_lun/ro",
+                    // Are we enabling it?
+                    "[[ 1 == $enable ]] && (",
+                        // If so, create and configure mass storage gadget
+                        "mkdir $usb_fun",
+                        "echo 0 > $usb_lun/cdrom",
+                        "echo $file > $usb_lun/file",
+                        "echo 'USBMountr' > $usb_lun/inquiry_string",
+                        "echo 1 > $usb_lun/nofua",
+                        "echo $ro > $usb_lun/ro",
 
-                    // Enable the gadget if told to
-                    "[[ 1 == $enable ]] && ln -s ../../functions/mass_storage.usb0 $usb_cfg/mass_storage.usb0",
+                        // Enable the gadget
+                        "cd $usb_cfg",
+                        "ln -s ../../functions/mass_storage.usb0",
+                        "cd -",
+                    ")",
 
-                    // Restore UDC and remove temp file
+                    // Restore UDC (re-enables USB) and remove temp file
                     "cat /data/local/tmp/udc.bak > $usb/UDC",
                     "rm /data/local/tmp/udc.bak",
 
