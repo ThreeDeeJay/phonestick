@@ -67,29 +67,39 @@ class MainActivity : Activity() {
 
     inner class UsbScript : AsyncTask<String, Void, Int>() {
         override fun doInBackground(vararg params: String): Int {
-            val usb = "/sys/class/android_usb/android0"
+            val usb = "/config/usb_gadget/g1"
+            val usb_fun = "$usb/functions/mass_storage.usb0"
+            val usb_lun = "$usb_fun/mass_storage.usb0/lun.0"
+            val usb_cfg = "$usb/configs/b.1"
             val file = params[0]
             val ro = params[1]
             val enable = params[2]
 
             if (!(Shell.SU.run(arrayOf(
-                    "echo 0 > $usb/enable",
-                    // Try to append if the function is not already enabled (by ourselves most likely)
-                    "grep mass_storage $usb/functions > /dev/null || sed -e 's/$/,mass_storage/' $usb/functions | cat > $usb/functions",
-                    // If empty, set ourselves as the only function
-                    "[[ -z $(cat $usb/functions) ]] && echo mass_storage > $usb/functions",
-                    // Disable the feature if told to
-                    "[[ 0 == $enable ]] && sed -e 's/mass_storage//' $usb/functions | cat > $usb/functions",
-                    "echo disk > $usb/f_mass_storage/luns",
-                    "echo USBMountr > $usb/f_mass_storage/inquiry_string",
-                    "echo 1 > $usb/enable",
-                    "[[ -f $usb/f_mass_storage/luns ]] && echo > $usb/f_mass_storage/lun0/file",
-                    "[[ -f $usb/f_mass_storage/luns ]] && echo $ro > $usb/f_mass_storage/lun0/ro",
-                    "[[ -f $usb/f_mass_storage/luns ]] && echo $file > $usb/f_mass_storage/lun0/file",
-                    // Older kernels only support a single lun, cope with it
-                    "[[ ! -f $usb/f_mass_storage/luns ]] && echo > $usb/f_mass_storage/lun/file",
-                    "[[ ! -f $usb/f_mass_storage/luns ]] && echo $ro > $usb/f_mass_storage/lun/ro",
-                    "[[ ! -f $usb/f_mass_storage/luns ]] && echo $file > $usb/f_mass_storage/lun/file",
+                    // Remember current UDC and disable USB
+                    "cat $usb/UDC > /data/local/tmp/udc.bak",
+                    "echo > $usb/UDC",
+                    
+                    // Disable and remove any existing mass storage gadget(s)
+                    "if [ -e $usb_cfg/mass_storage.usb0 ]; then rm -f $usb_cfg/mass_storage.usb0; fi",
+                    "if [ -e $usb_fun/mass_storage.usb0 ]; then rmdir $usb_fun/mass_storage.usb0; fi",
+
+                    // Create and configure mass storage gadget
+                    "mkdir $usb_fun/mass_storage.usb0",
+                    "echo 0 > $usb_lun/cdrom",
+                    "echo $file > $usb_lun/file",
+                    "echo USBMountr > $usb_lun/inquiry_string",
+                    "echo 1 > $usb_lun/nofua",
+                    "echo $ro > $usb_lun/ro",
+
+                    // Enable the gadget if told to
+                    "[[ 1 == $enable ]] && ln -s ../../functions/mass_storage.usb0 $usb_cfg/mass_storage.usb0",
+
+                    // Restore UDC and remove temp file
+                    "cat /data/local/tmp/udc.bak > $usb/UDC",
+                    "rm /data/local/tmp/udc.bak",
+
+                    // And we're done!
                     "echo success"
             ))?.isEmpty() ?: true)) {
                 if (enable != "0") {
