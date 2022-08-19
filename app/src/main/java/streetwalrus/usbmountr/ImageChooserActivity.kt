@@ -25,7 +25,7 @@ class ImageChooserActivity : Activity() {
     private var directory = File("/")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        directory = filesDir
+        directory = getExternalFilesDir(null)
         setContentView(R.layout.activity_image_chooser)
         actionBar?.setDisplayHomeAsUpEnabled(true)
 
